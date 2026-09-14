@@ -5,6 +5,9 @@
 # 忽略数据库文件
 *.db
 db/forward.db1
+# 显式排除运行时目录：发布公共镜像时绝不能把本地数据/会话打进去
+db/
+sessions/
 
 # 忽略 Python 生成的缓存文件
 **/__pycache__/

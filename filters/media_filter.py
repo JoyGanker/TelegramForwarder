@@ -10,6 +10,7 @@ from models.models import MediaTypes
 from models.models import get_session
 from sqlalchemy import text
 from utils.common import get_db_ops
+from utils.download_manager import download_manager
 from enums.enums import AddMode
 logger = logging.getLogger(__name__)
 
@@ -240,8 +241,8 @@ class MediaFilter(BaseFilter):
                 if rule.only_rss:
                     return True
                 try:
-                    # 下载媒体文件
-                    file_path = await event.message.download_media(TEMP_DIR)
+                    # 下载媒体文件（通过下载队列管理并发与背压）
+                    file_path = await download_manager.download_single(event.message, TEMP_DIR)
                     if file_path:
                         context.media_files.append(file_path)
                         logger.info(f'媒体文件已下载到: {file_path}')
