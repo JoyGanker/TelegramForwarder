@@ -3,6 +3,25 @@ import os
 
 logger = logging.getLogger(__name__)
 
+def has_downloadable_media(message) -> bool:
+    """判断消息是否包含可下载的媒体文件
+
+    判定为「有媒体」的类型：图片(photo)、文档(document)、视频(video)、
+    音频(audio)、语音(voice)。其余情况（纯文本、webpage 链接预览等）
+    均视为无可下载媒体。
+    """
+    media = getattr(message, 'media', None)
+    if not media:
+        return False
+    return any([
+        getattr(media, 'photo', None),
+        getattr(media, 'document', None),
+        getattr(media, 'video', None),
+        getattr(media, 'audio', None),
+        getattr(media, 'voice', None),
+    ])
+
+
 async def get_media_size(media):
     """获取媒体文件大小"""
     if not media:

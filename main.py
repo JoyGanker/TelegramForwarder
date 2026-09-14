@@ -15,6 +15,8 @@ from scheduler.chat_updater import ChatUpdater
 from handlers.bot_handler import send_welcome_message
 from rss.main import app as rss_app
 from utils.log_config import setup_logging
+from utils.download_manager import download_manager
+from scheduler.message_refresher import message_refresher
 
 # 设置Docker日志的默认配置，如果docker-compose.yml中没有配置日志选项将使用这些值
 os.environ.setdefault('DOCKER_LOG_MAX_SIZE', '10m')
@@ -96,6 +98,13 @@ async def start_clients():
         # 设置消息监听器
         await setup_listeners(user_client, bot_client)
 
+        # 启动下载队列（Bot 模式下载到本地的统一队列）
+        await download_manager.start()
+
+        # 启动消息刷新机制（Bot 模式定时补漏被 Telethon 漏收的消息）
+        message_refresher.init(user_client, bot_client)
+        await message_refresher.start()
+
         # 注册命令
         await register_bot_commands(bot_client)
 
@@ -139,6 +148,10 @@ async def start_clients():
         # 关闭 DBOperations
         if db_ops and hasattr(db_ops, 'close'):
             await db_ops.close()
+        # 停止下载队列
+        await download_manager.stop()
+        # 停止消息刷新机制
+        await message_refresher.stop()
         # 停止调度器
         if scheduler:
             scheduler.stop()

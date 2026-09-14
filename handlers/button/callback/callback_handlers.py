@@ -664,6 +664,7 @@ CALLBACK_HANDLERS = {
     'media_extensions_page': callback_media_extensions_page,
     'toggle_media_extension': callback_toggle_media_extension,
     'toggle_media_allow_text': callback_toggle_media_allow_text,
+    'toggle_skip_pure_text': callback_toggle_skip_pure_text,
     'noop': callback_noop,
     # 其他设置
     'other_settings': callback_other_settings,

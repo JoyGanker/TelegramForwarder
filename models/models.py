@@ -16,6 +16,7 @@ class Chat(Base):
     telegram_chat_id = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=True)
     current_add_id = Column(String, nullable=True)
+    last_processed_message_id = Column(Integer, nullable=True)  # 刷新机制：上次处理到的消息ID
 
     # 关系
     source_rules = relationship('ForwardRule', foreign_keys='ForwardRule.source_chat_id', back_populates='source_chat')
@@ -56,6 +57,7 @@ class ForwardRule(Base):
     enable_reverse_blacklist = Column(Boolean, default=False)  # 是否反转黑名单
     enable_reverse_whitelist = Column(Boolean, default=False)  # 是否反转白名单
     media_allow_text = Column(Boolean, default=False)  # 是否放行文本
+    skip_pure_text = Column(Boolean, default=False)  # 是否跳过纯文本消息（无媒体的消息不下载不转发）
     # 推送相关字段
     enable_push = Column(Boolean, default=False)  # 是否启用推送
     enable_only_push = Column(Boolean, default=False)  # 是否只转发到推送配置
@@ -328,6 +330,14 @@ def migrate_db(engine):
     # 检查Keyword表的现有列
     keyword_columns = {column['name'] for column in inspector.get_columns('keywords')}
 
+    # 检查chats表的现有列
+    chats_columns = {column['name'] for column in inspector.get_columns('chats')}
+
+    # chats 表需要添加的新列
+    chats_new_columns = {
+        'last_processed_message_id': 'ALTER TABLE chats ADD COLUMN last_processed_message_id INTEGER DEFAULT NULL',
+    }
+
     # 需要添加的新列及其默认值
     forward_rules_new_columns = {
         'is_ai': 'ALTER TABLE forward_rules ADD COLUMN is_ai BOOLEAN DEFAULT FALSE',
@@ -365,6 +375,7 @@ def migrate_db(engine):
         'enable_only_push': 'ALTER TABLE forward_rules ADD COLUMN enable_only_push BOOLEAN DEFAULT FALSE',
         'media_allow_text': 'ALTER TABLE forward_rules ADD COLUMN media_allow_text BOOLEAN DEFAULT FALSE',
         'enable_ai_upload_image': 'ALTER TABLE forward_rules ADD COLUMN enable_ai_upload_image BOOLEAN DEFAULT FALSE',
+        'skip_pure_text': 'ALTER TABLE forward_rules ADD COLUMN skip_pure_text BOOLEAN DEFAULT FALSE',
     }
 
     keywords_new_columns = {
@@ -386,6 +397,15 @@ def migrate_db(engine):
         # 添加keywords表的列
         for column, sql in keywords_new_columns.items():
             if column not in keyword_columns:
+                try:
+                    connection.execute(text(sql))
+                    logging.info(f'已添加列: {column}')
+                except Exception as e:
+                    logging.error(f'添加列 {column} 时出错: {str(e)}')
+
+        # 添加chats表的列
+        for column, sql in chats_new_columns.items():
+            if column not in chats_columns:
                 try:
                     connection.execute(text(sql))
                     logging.info(f'已添加列: {column}')

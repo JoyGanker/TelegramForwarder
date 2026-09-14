@@ -358,6 +358,15 @@ MEDIA_SETTINGS = {
         },
         'toggle_action': 'toggle_media_allow_text',
         'toggle_func': lambda current: not current
+    },
+    'skip_pure_text': {
+        'display_name': '跳过纯文本消息',
+        'values': {
+            True: '开启',
+            False: '关闭'
+        },
+        'toggle_action': 'toggle_skip_pure_text',
+        'toggle_func': lambda current: not current
     }
 }
 

@@ -10,14 +10,13 @@ from telethon.tl.types import ChannelParticipantsAdmins
 from managers.state_manager import state_manager
 from telethon.tl import types
 from filters.process import process_forward_rule
+from scheduler.message_refresher import message_refresher
+from utils.group_cache import mark_group_processed
 # 加载环境变量
 load_dotenv()
 
 # 获取logger
 logger = logging.getLogger(__name__)
-
-# 添加一个缓存来存储已处理的媒体组
-PROCESSED_GROUPS = set()
 
 BOT_ID = None
 
@@ -102,16 +101,11 @@ async def handle_user_message(event, user_client, bot_client):
             return
         # logger.info("提示词设置处理未完成，继续执行")
 
-    # 检查是否是媒体组消息
+    # 检查是否是媒体组消息（与刷新机制共用去重缓存）
     if event.message.grouped_id:
-        # 如果这个媒体组已经处理过，就跳过
-        group_key = f"{chat_id}:{event.message.grouped_id}"
-        if group_key in PROCESSED_GROUPS:
+        if not mark_group_processed(chat_id, event.message.grouped_id):
             return
-        # 标记这个媒体组为已处理
-        PROCESSED_GROUPS.add(group_key)
-        asyncio.create_task(clear_group_cache(group_key))
-    
+
     # 首先检查数据库中是否有该聊天的转发规则
     session = get_session()
     try:
@@ -134,7 +128,10 @@ async def handle_user_message(event, user_client, bot_client):
         if not rules:
             logger.info(f'聊天 {source_chat.name} 没有转发规则')
             return
-        
+
+        # 标记该消息已由事件路径处理，避免定时刷新重复拉取转发（重复由过滤器链保证）
+        message_refresher.mark_processed(str(chat_id), event.message.id)
+
         # 有转发规则时，才记录消息信息
         if event.message.grouped_id:
             logger.info(f'[用户] 收到媒体组消息 来自聊天: {source_chat.name} ({chat_id}) 组ID: {event.message.grouped_id}')
@@ -202,9 +199,4 @@ async def handle_bot_message(event, bot_client):
     except Exception as e:
         logger.error(f'处理机器人命令时发生错误: {str(e)}')
         logger.exception(e)
-
-async def clear_group_cache(group_key, delay=300):  # 5分钟后清除缓存
-    """清除已处理的媒体组记录"""
-    await asyncio.sleep(delay)
-    PROCESSED_GROUPS.discard(group_key) 
 

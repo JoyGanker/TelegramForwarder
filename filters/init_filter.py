@@ -4,6 +4,7 @@ import pytz
 import asyncio
 from utils.constants import TEMP_DIR
 from utils.media import get_max_media_size
+from utils.media import has_downloadable_media
 
 from filters.base_filter import BaseFilter
 
@@ -26,6 +27,14 @@ class InitFilter(BaseFilter):
         """
         rule = context.rule
         event = context.event
+
+        # 跳过纯文本消息：规则开启该设置后，无任何可下载媒体的消息直接中断整条过滤器链
+        # （不下载、不转发、不推送、不写RSS），实现"直接跳过这一条"
+        if getattr(rule, 'skip_pure_text', False) and not has_downloadable_media(event.message):
+            logger.info(
+                f'规则 {rule.id} 开启了"跳过纯文本消息"，消息 ID={event.message.id} 无媒体，直接跳过'
+            )
+            return False
 
         # logger.info(f"InitFilter处理消息前，context: {context.__dict__}")
         try:

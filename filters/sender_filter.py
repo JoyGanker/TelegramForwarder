@@ -3,6 +3,8 @@ import os
 from filters.base_filter import BaseFilter
 from enums.enums import PreviewMode
 from telethon.errors import FloodWaitError
+from utils.constants import TEMP_DIR
+from utils.download_manager import download_manager
 
 logger = logging.getLogger(__name__)
 
@@ -131,12 +133,13 @@ class SenderFilter(BaseFilter):
         # 如果有可以发送的媒体，作为一个组发送
         files = []
         try:
-            for message in context.media_group_messages:
-                if message.media:
-                    file_path = await message.download_media(os.path.join(os.getcwd(), 'temp'))
-                    if file_path:
-                        files.append(file_path)
-            
+            # 通过下载队列批量下载媒体组文件（受并发与队列上限控制）
+            downloaded = await download_manager.download_group(
+                context.media_group_messages, TEMP_DIR
+            )
+            if downloaded:
+                files.extend(downloaded)
+
             # 修改：保存下载的文件路径到context.media_files
             if files:
                 # 初始化 media_files 如果它不存在
